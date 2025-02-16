@@ -6,7 +6,7 @@ function saveOptions() {
 
     chrome.storage.sync.set({
         viewThreshold: parseInt(threshold),
-        maxViewThreshold: parseInt(maxThreshold), // Save max threshold
+        viewMaxThreshold: parseInt(maxThreshold), // Save max threshold
         extensionEnabled: extensionEnabled
     }, function () {
         const status = document.getElementById('status');
@@ -22,11 +22,11 @@ function restoreOptions() {
 
     chrome.storage.sync.get({
         viewThreshold: 1000, // default value
-        maxViewThreshold: 0, // default max threshold to 0 (no upper bound)
+        viewMaxThreshold: 0, // default max threshold to 0 (no upper bound)
         extensionEnabled: true // default to enabled
     }, function (items) {
         document.getElementById('threshold').value = items.viewThreshold;
-        document.getElementById('maxThreshold').value = items.maxViewThreshold; // Restore max threshold input
+        document.getElementById('maxThreshold').value = items.viewMaxThreshold; // Restore max threshold input
         updateEnableButtonState(enableButton, items.extensionEnabled);
     });
 }
