@@ -1,19 +1,57 @@
 let viewThreshold = 1000; // Default value,  updated from storage
+let viewMaxThreshold = 0; // Default max threshold, updated from storage - 0 means no max limit
+let extensionEnabled = true; // Default to enabled, updated from storage
 
-// Get the threshold from storage
-chrome.storage.sync.get(['viewThreshold'], function (result) {
-    if (result.viewThreshold) {
+// Get settings from storage
+chrome.storage.sync.get(['viewThreshold', 'viewMaxThreshold', 'extensionEnabled'], function (result) {
+    if (result.viewThreshold !== undefined) {
         viewThreshold = result.viewThreshold;
     }
-});
-
-// Listen for threshold updates
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (changes.viewThreshold) {
-        viewThreshold = changes.viewThreshold.newValue;
-        debouncedHideNoViewVideos(); // Re-run filtering with new threshold
+    if (result.viewMaxThreshold !== undefined) { // Load max threshold from storage
+        viewMaxThreshold = result.viewMaxThreshold;
+    }
+    if (result.extensionEnabled !== undefined) {
+        extensionEnabled = result.extensionEnabled;
+    }
+    if (extensionEnabled) {
+        initializeExtension();
     }
 });
+
+// Listen for storage updates
+chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'sync') {
+        if (changes.viewThreshold) {
+            viewThreshold = changes.viewThreshold.newValue;
+        }
+        if (changes.viewMaxThreshold) { // Update max threshold from storage
+            viewMaxThreshold = changes.viewMaxThreshold.newValue;
+        }
+        if (changes.extensionEnabled !== undefined) {
+            extensionEnabled = changes.extensionEnabled.newValue;
+        }
+
+        // Re-run filtering if enabled and threshold or enabled state changed
+        if (extensionEnabled && (changes.viewThreshold || changes.viewMaxThreshold || changes.extensionEnabled)) {
+            debouncedHideNoViewVideos();
+        } else if (!extensionEnabled) {
+            // If disabled, remove any applied styles and disconnect observer
+            resetVideoStyles();
+            if (window.viewFilterObserver) {
+                window.viewFilterObserver.disconnect();
+            }
+        }
+    }
+});
+
+// Function to reset video styles when extension is disabled
+function resetVideoStyles() {
+    const videoItems = getAllVideoItems();
+    videoItems.forEach(item => {
+        item.style.removeProperty('display');
+        item.classList.remove('low-views', 'hidden-video');
+    });
+}
 
 function getViewCountElement(videoItem) {
     // Get the actual video container if we're on a wrapper element
@@ -141,6 +179,11 @@ function parseViewCount(viewText) {
 }
 
 async function hideNoViewVideos() {
+    if (!extensionEnabled) {
+        console.log('YouTube View Filter: Extension is disabled, skipping filtering.');
+        return;
+    }
+
     try {
         const videoItems = getAllVideoItems();
         console.log('Processing video items:', videoItems.length);
@@ -155,19 +198,30 @@ async function hideNoViewVideos() {
                 const viewText = viewCountElement.textContent.trim();
                 const viewCount = parseViewCount(viewText);
 
-                console.log(`Video stats - Text: "${viewText}", Count: ${viewCount}, Threshold: ${viewThreshold}`);
+                console.log(`Video stats - Text: "${viewText}", Count: ${viewCount}, Min Threshold: ${viewThreshold}, Max Threshold: ${viewMaxThreshold}`);
                 processedCount++;
 
-                if (viewCount < viewThreshold) {
-                    console.log(`Hiding video - Views: ${viewCount}`);
+                let shouldHide = false;
+
+                if (viewThreshold > 0 && viewCount < viewThreshold) { // Check minimum threshold
+                    shouldHide = true;
+                    console.log(`Hiding video - Views: ${viewCount} (below min threshold)`);
+                }
+
+                if (viewMaxThreshold > 0 && viewCount > viewMaxThreshold) { // Check maximum threshold
+                    shouldHide = true;
+                    console.log(`Hiding video - Views: ${viewCount} (above max threshold)`);
+                }
+
+                if (shouldHide) {
                     item.classList.add('low-views');
-                    
+
                     // Add hidden-video class after animation completes
                     item.addEventListener('transitionend', () => {
                         item.classList.add('hidden-video');
                         item.style.setProperty('display', 'none', 'important');
                     }, { once: true });
-                    
+
                     hiddenCount++;
                 } else {
                     item.style.removeProperty('display');
@@ -181,6 +235,7 @@ async function hideNoViewVideos() {
         console.error('YouTube View Filter: Error hiding videos:', error);
     }
 }
+
 
 // Debounce function to prevent too frequent updates
 function debounce(func, wait) {
@@ -229,16 +284,34 @@ window.viewFilterObserver = new MutationObserver((mutations) => {
     }
 });
 
+// Create and store observer instance
+window.viewFilterObserver = new MutationObserver((mutations) => {
+    if (!extensionEnabled) return; // Check if enabled before processing mutations
+
+    const shouldUpdate = mutations.some(mutation => {
+        // Check if the mutation is relevant to video content
+        return mutation.target.tagName &&
+            (mutation.target.tagName.toLowerCase().includes('ytd-') ||
+                mutation.target.id === 'contents' ||
+                mutation.target.id === 'content');
+    });
+
+    if (shouldUpdate) {
+        debouncedHideNoViewVideos();
+    }
+});
+
 // Start observing with updated configuration
 window.viewFilterObserver.observe(document.body, observerConfig);
 
 // Initialize the extension
 async function initializeExtension() {
+    if (!extensionEnabled) {
+        console.log('YouTube View Filter: Extension is disabled, skipping initialization.');
+        return;
+    }
     try {
-        // Get the threshold from storage using Promise
-        const result = await chrome.storage.sync.get(['viewThreshold']);
-        viewThreshold = result.viewThreshold || 1000; // Default to 1000 if not set
-
+        // No need to get viewThreshold again here, it's already loaded in the initial storage get
         // Initial run with a small delay to ensure DOM is ready
         await new Promise(resolve => setTimeout(resolve, 1000));
         await hideNoViewVideos();
@@ -264,6 +337,8 @@ function setupObserver() {
     };
 
     window.viewFilterObserver = new MutationObserver((mutations) => {
+        if (!extensionEnabled) return; // Check if enabled before processing mutations
+
         const shouldUpdate = mutations.some(mutation => {
             const target = mutation.target;
             return target.tagName && (
@@ -283,24 +358,20 @@ function setupObserver() {
     window.viewFilterObserver.observe(document.body, observerConfig);
 }
 
-// Update storage listener for Manifest V3
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === 'sync' && changes.viewThreshold) {
-        viewThreshold = changes.viewThreshold.newValue;
-        debouncedHideNoViewVideos();
-    }
-});
-
-// Initialize the extension
+// Initialize the extension based on document ready and if enabled initially
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initializeExtension);
+    document.addEventListener('DOMContentLoaded', () => {
+        // Initialization is now handled in the initial storage.get callback based on extensionEnabled
+    });
 } else {
-    initializeExtension();
+    // Initialization is now handled in the initial storage.get callback based on extensionEnabled
 }
 
 // Handle navigation changes (for YouTube's SPA behavior)
 let lastUrl = location.href;
 new MutationObserver(() => {
+    if (!extensionEnabled) return; // Check if enabled before handling navigation
+
     const url = location.href;
     if (url !== lastUrl) {
         lastUrl = url;

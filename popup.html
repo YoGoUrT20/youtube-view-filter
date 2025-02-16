@@ -5,7 +5,7 @@
     <title>YouTube View Filter</title>
     <style>
         body {
-            width: 300px;
+            width: 320px;
             padding: 20px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #f9f9f9;
@@ -24,11 +24,12 @@
         label {
             font-weight: 500;
             color: #333;
+            display: block; /* Ensure label is on its own line */
         }
 
         input {
-            width: calc(100% - 24px);
-            padding: 8px 12px;
+            width: calc(100% - 0px);
+            padding: 8px 8px;
             border: 2px solid #e0e0e0;
             border-radius: 4px;
             font-size: 14px;
@@ -44,16 +45,30 @@
         button {
             padding: 10px;
             cursor: pointer;
-            background: #ff0000;
             color: white;
             border: none;
             border-radius: 4px;
             font-weight: 500;
-            transition: background 0.3s;
+            transition: background 0.3s, color 0.3s;
+            text-align: center; /* Ensure text is centered */
         }
 
         button:hover {
-            background: #cc0000;
+            background: #cc0000; /* Hover for primary button color */
+        }
+
+        button#enableButton {
+            background: #4CAF50; /* Default "enabled" color - Green */
+        }
+
+        button#enableButton.disabled {
+            background: #9e9e9e; /* "Disabled" color - Grey */
+            color: #eee; /* Lighter text for disabled state */
+            cursor: default; /* No cursor interaction when disabled */
+        }
+
+        button#save {
+            background: #ff0000; /* Save button color - Red */
         }
 
         #status {
@@ -68,8 +83,10 @@
 
 <body>
     <div class="container">
+        <button id="enableButton">Enable</button>
         <label for="threshold">Minimum View Count</label>
-        <input type="number" id="threshold" min="0" step="1000" placeholder="Enter view count...">
+        <input type="number" id="threshold" min="0" step="1000" placeholder="Enter minimum view count">
+        <label for="maxThreshold">Maximum View Count (Optional)</label> <input type="number" id="maxThreshold" min="0" step="1000" placeholder="Enter maximum view count (0 for none)">
         <button id="save">Save Settings</button>
         <div id="status"></div>
     </div>
