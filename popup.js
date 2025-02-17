@@ -36,7 +36,7 @@ function updateEnableButtonState(button, isEnabled) {
         button.textContent = 'Enabled'; // Changed to 'Enable' for clarity
         button.classList.remove('disabled');
     } else {
-        button.textContent = 'Disabled';  // Changed to 'Enable' for clarity
+        button.textContent = 'Disabled'; // Changed to 'Disable' for clarity
         button.classList.add('disabled');
     }
 }
