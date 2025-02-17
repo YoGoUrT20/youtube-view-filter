@@ -33,7 +33,7 @@ function restoreOptions() {
 
 function updateEnableButtonState(button, isEnabled) {
     if (isEnabled) {
-        button.textContent = 'Enabled'; // Changed to 'Disable' for clarity
+        button.textContent = 'Enabled'; // Changed to 'Enable' for clarity
         button.classList.remove('disabled');
     } else {
         button.textContent = 'Disabled';  // Changed to 'Enable' for clarity
