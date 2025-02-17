@@ -271,29 +271,17 @@ if (window.viewFilterObserver) {
 
 // Create and store observer instance
 window.viewFilterObserver = new MutationObserver((mutations) => {
-    const shouldUpdate = mutations.some(mutation => {
-        // Check if the mutation is relevant to video content
-        return mutation.target.tagName &&
-            (mutation.target.tagName.toLowerCase().includes('ytd-') ||
-                mutation.target.id === 'contents' ||
-                mutation.target.id === 'content');
-    });
-
-    if (shouldUpdate) {
-        debouncedHideNoViewVideos();
-    }
-});
-
-// Create and store observer instance
-window.viewFilterObserver = new MutationObserver((mutations) => {
-    if (!extensionEnabled) return; // Check if enabled before processing mutations
+    if (!extensionEnabled) return;
 
     const shouldUpdate = mutations.some(mutation => {
         // Check if the mutation is relevant to video content
-        return mutation.target.tagName &&
-            (mutation.target.tagName.toLowerCase().includes('ytd-') ||
-                mutation.target.id === 'contents' ||
-                mutation.target.id === 'content');
+        const target = mutation.target;
+        return target.tagName && (
+            target.tagName.toLowerCase().includes('ytd-') ||
+            target.id === 'contents' ||
+            target.id === 'content' ||
+            target.classList?.contains('ytd-rich-grid-renderer')
+        );
     });
 
     if (shouldUpdate) {
