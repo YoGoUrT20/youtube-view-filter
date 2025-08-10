@@ -44,15 +44,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
     }
 });
 
-// Function to reset video styles when extension is disabled
-function resetVideoStyles() {
-    const videoItems = getAllVideoItems();
-    videoItems.forEach(item => {
-        item.style.removeProperty('display');
-        item.classList.remove('low-views', 'hidden-video');
-    });
-}
-
 function getViewCountElement(videoItem) {
     // Get the actual video container if we're on a wrapper element
     const actualVideoItem = videoItem.querySelector('ytd-rich-grid-media') || videoItem;
@@ -178,62 +169,59 @@ function parseViewCount(viewText) {
     return number;
 }
 
+
 async function hideNoViewVideos() {
-    if (!extensionEnabled) {
-        console.log('YouTube View Filter: Extension is disabled, skipping filtering.');
+    if (!extensionEnabled) return;
+
+    // Skip filtering on Feed and Channcels pages
+    const ignoredPaths = ['/feed', '/@'];
+    if (ignoredPaths.some(path => location.pathname.startsWith(path))) {
         return;
     }
 
     try {
         const videoItems = getAllVideoItems();
-        console.log('Processing video items:', videoItems.length);
-
-        let hiddenCount = 0;
-        let processedCount = 0;
 
         for (const item of videoItems) {
             const viewCountElement = getViewCountElement(item);
 
-            if (viewCountElement) {
-                const viewText = viewCountElement.textContent.trim();
-                const viewCount = parseViewCount(viewText);
+            if (!viewCountElement) {
+                continue;
+            }
 
-                console.log(`Video stats - Text: "${viewText}", Count: ${viewCount}, Min Threshold: ${viewThreshold}, Max Threshold: ${viewMaxThreshold}`);
-                processedCount++;
+            const viewText = viewCountElement.textContent.trim();
+            const viewCount = parseViewCount(viewText);
 
-                let shouldHide = false;
+            let shouldHide = false;
 
-                if (viewThreshold > 0 && viewCount < viewThreshold) { // Check minimum threshold
-                    shouldHide = true;
-                    console.log(`Hiding video - Views: ${viewCount} (below min threshold)`);
-                }
+            if (viewThreshold > 0 && viewCount < viewThreshold) { // Check minimum threshold
+                shouldHide = true;
+                console.log(`Hiding video - Views: ${viewCount} (below min threshold)`);
+            }
 
-                if (viewMaxThreshold > 0 && viewCount > viewMaxThreshold) { // Check maximum threshold
-                    shouldHide = true;
-                    console.log(`Hiding video - Views: ${viewCount} (above max threshold)`);
-                }
+            if (viewMaxThreshold > 0 && viewCount > viewMaxThreshold) { // Check maximum threshold
+                shouldHide = true;
+                console.log(`Hiding video - Views: ${viewCount} (above max threshold)`);
+            }
 
-                if (shouldHide) {
-                    item.classList.add('low-views');
-
-                    // Add hidden-video class after animation completes
-                    item.addEventListener('transitionend', () => {
-                        item.classList.add('hidden-video');
-                        item.style.setProperty('display', 'none', 'important');
-                    }, { once: true });
-
-                    hiddenCount++;
-                } else {
-                    item.style.removeProperty('display');
-                    item.classList.remove('low-views', 'hidden-video');
-                }
+            if (shouldHide) {
+                item.style.setProperty('display', 'none', 'important');
+                item.classList.add('hidden-video');
+            } else {
+                item.style.removeProperty('display');
+                item.classList.remove('hidden-video');
             }
         }
-
-        console.log(`Summary: Processed ${processedCount}/${videoItems.length} videos, Hidden ${hiddenCount} videos`);
     } catch (error) {
         console.error('YouTube View Filter: Error hiding videos:', error);
     }
+}
+
+// Run immediately after DOM starts loading
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', hideNoViewVideos);
+} else {
+    hideNoViewVideos();
 }
 
 
